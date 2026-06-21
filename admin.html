@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Espace Admin - CabinetMédical</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+    <header>
+        <div class="brand"><i class="fa-solid fa-shield-halved"></i> CABINET<span>MÉDICAL</span> <small>[ADMIN]</small></div>
+        <button onclick="sortir()" class="btn-logout"><i class="fa-solid fa-right-from-bracket"></i> Déconnexion</button>
+    </header>
+
+    <div class="container">
+        <div class="top-bar">
+            <h2>Indemnités et Calcul des Soins</h2>
+        </div>
+
+        <div class="admin-grid">
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fa-solid fa-road"></i></div>
+                <div class="stat-info"><label>Seuil Km</label><span>20 Km / Jour</span></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fa-solid fa-money-bill-wave"></i></div>
+                <div class="stat-info"><label>Tarif Km Supp.</label><span>2.00 DH</span></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fa-solid fa-clock"></i></div>
+                <div class="stat-info"><label>Prime Pénibilité</label><span>10.00 DH</span></div>
+            </div>
+        </div>
+
+        <div class="table-wrapper" style="margin-bottom: 30px;">
+            <div class="filter-bar">
+                <div>
+                    <label>Mois d'analyse :</label><br>
+                    <input type="month" id="monthPick" onchange="calculerIndemnites()">
+                </div>
+                <div>
+                    <label>Forfait Base (DH) :</label><br>
+                    <input type="number" id="forfaitInput" value="1500" min="0" oninput="calculerIndemnites()">
+                </div>
+            </div>
+        </div>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Infirmier(e)</th>
+                        <th>Distance Totale</th>
+                        <th>Km Supp.</th>
+                        <th>Soins Pénibles</th>
+                        <th>Détails</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody id="adminTableBody"></tbody>
+            </table>
+        </div>
+
+        <div class="top-bar" style="margin-top: 40px;">
+            <h2>Gestion des Utilisateurs</h2>
+            <button class="primary-btn" onclick="openUserPanel()" style="width: auto; padding: 10px 20px;"><i class="fa-solid fa-user-plus"></i> Ajouter</button>
+        </div>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nom</th>
+                        <th>Rôle</th>
+                        <th>Mot de passe</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="usersTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Panneau latéral pour ajouter/modifier un utilisateur -->
+    <div class="side-panel" id="userPanel">
+        <button class="close-panel" onclick="closeUserPanel()"><i class="fa-solid fa-xmark"></i></button>
+        <h3 id="userPanelTitle" style="margin-bottom: 25px;">Ajouter Utilisateur</h3>
+        
+        <input type="hidden" id="userIdInput">
+        
+        <div class="fieldBox">
+            <label>Nom Complet</label>
+            <input type="text" id="userNameInput" placeholder="Ex: Yasmine" style="margin-top: 5px;">
+        </div>
+        
+        <div class="fieldBox">
+            <label>Mot de passe</label>
+            <input type="text" id="userPassInput" placeholder="Mot de passe" style="margin-top: 5px;">
+        </div>
+
+        <div class="fieldBox">
+            <label>Rôle</label>
+            <select id="userRoleInput" style="width: 100%; padding: 14px 15px; border: 2px solid var(--border); border-radius: 10px; font-family: 'Poppins', sans-serif; font-size: 14px; margin-top: 5px;">
+                <option value="infirmier">Infirmier</option>
+                <option value="admin">Admin</option>
+            </select>
+        </div>
+
+        <button class="primary-btn" onclick="saveUser()" style="margin-top: 20px;">
+            <i class="fa-solid fa-save"></i> Enregistrer
+        </button>
+    </div>
+
+
+    <script>
+        const sess = JSON.parse(localStorage.getItem('activeUser'));
+        if (!sess || sess.role !== 'admin') window.location.href = 'index.html';
+        
+        document.getElementById('monthPick').value = "2026-06";
+
+        function calculerIndemnites(){
+            const selMonth = document.getElementById('monthPick').value;
+            const forfaitBase = parseFloat(document.getElementById('forfaitInput').value) || 0;
+            
+            const allSoins = JSON.parse(localStorage.getItem('soins')) || [];
+            const allUsers = JSON.parse(localStorage.getItem('users')) || [];
+            const infirmiers = allUsers.filter(u => u.role === 'infirmier');
+            
+            const table = document.getElementById('adminTableBody');
+            table.innerHTML = '';
+            
+            infirmiers.forEach(inf => {
+                const mine = allSoins.filter(s => s.infirmierId === inf.id && s.date.startsWith(selMonth));
+                
+                let totalKmDuMois = 0;
+                let totalKmSuppRemuneres = 0;
+                let nbSoinsPenibles = 0;
+                let kmsParJour = {};
+
+                mine.forEach(s => {
+                    totalKmDuMois += s.distanceKm;
+                    if (!kmsParJour[s.date]) kmsParJour[s.date] = 0;
+                    kmsParJour[s.date] += s.distanceKm;
+
+                    const [hD, mD] = s.heureDebut.split(':').map(Number);
+                    const [hF, mF] = s.heureFin.split(':').map(Number);
+                    if (((hF * 60 + mF) - (hD * 60 + mD)) > 30) nbSoinsPenibles++;
+                });
+
+                for (let jour in kmsParJour) {
+                    if (kmsParJour[jour] > 20) totalKmSuppRemuneres += (kmsParJour[jour] - 20);
+                }
+
+                const totalFinal = forfaitBase + (totalKmSuppRemuneres * 2) + (nbSoinsPenibles * 10);
+
+                table.innerHTML += `
+                    <tr>
+                        <td style="font-weight:600;"><i class="fa-solid fa-user-circle" style="margin-right:8px; color:#0ea5e9;"></i>${inf.nom}</td>
+                        <td>${totalKmDuMois} km</td>
+                        <td><span class="badge ${totalKmSuppRemuneres > 0 ? 'badge-success' : 'badge-neutral'}">${totalKmSuppRemuneres} km</span></td>
+                        <td>${nbSoinsPenibles} soin(s)</td>
+                        <td style="font-size:11px; color:#64748b;">${totalFinal.toFixed(2)} DH (Base + Supp)</td>
+                        <td class="bonus-amt">${totalFinal.toFixed(2)} DH</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function sortir() {
+            localStorage.removeItem('activeUser');
+            window.location.href='index.html';
+        }
+
+        // --- Gestion des utilisateurs ---
+
+        function afficherUsers() {
+            const allUsers = JSON.parse(localStorage.getItem('users')) || [];
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = '';
+            
+            allUsers.forEach(u => {
+                const roleBadge = u.role === 'admin' ? '<span class="badge badge-success">Admin</span>' : '<span class="badge badge-neutral">Infirmier</span>';
+                tbody.innerHTML += `
+                    <tr>
+                        <td>#${u.id}</td>
+                        <td style="font-weight:600;"><i class="fa-solid fa-user-circle" style="margin-right:8px; color:#0ea5e9;"></i>${u.nom}</td>
+                        <td>${roleBadge}</td>
+                        <td style="color:#64748b; font-family:monospace;">${u.pass}</td>
+                        <td>
+                            <div class="action-btns">
+                                <button class="btn-icon btn-edit" onclick="openUserPanel(${u.id})"><i class="fa-solid fa-pen"></i></button>
+                                <button class="btn-icon btn-delete" onclick="deleteUser(${u.id})" ${u.id === sess.id ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function openUserPanel(id = null) {
+            document.getElementById('userPanel').classList.add('active');
+            const allUsers = JSON.parse(localStorage.getItem('users')) || [];
+            
+            if (id) {
+                const u = allUsers.find(user => user.id === id);
+                if(u) {
+                    document.getElementById('userPanelTitle').innerText = 'Modifier Utilisateur';
+                    document.getElementById('userIdInput').value = u.id;
+                    document.getElementById('userNameInput').value = u.nom;
+                    document.getElementById('userPassInput').value = u.pass;
+                    document.getElementById('userRoleInput').value = u.role;
+                }
+            } else {
+                document.getElementById('userPanelTitle').innerText = 'Ajouter Utilisateur';
+                document.getElementById('userIdInput').value = '';
+                document.getElementById('userNameInput').value = '';
+                document.getElementById('userPassInput').value = '';
+                document.getElementById('userRoleInput').value = 'infirmier';
+            }
+        }
+
+        function closeUserPanel() {
+            document.getElementById('userPanel').classList.remove('active');
+        }
+
+        function saveUser() {
+            const id = document.getElementById('userIdInput').value;
+            const nom = document.getElementById('userNameInput').value.trim();
+            const pass = document.getElementById('userPassInput').value.trim();
+            const role = document.getElementById('userRoleInput').value;
+
+            if (!nom || !pass) {
+                alert("Veuillez remplir le nom et le mot de passe.");
+                return;
+            }
+
+            let allUsers = JSON.parse(localStorage.getItem('users')) || [];
+
+            if (id) {
+                // Modification
+                const idx = allUsers.findIndex(u => u.id === parseInt(id));
+                if (idx !== -1) {
+                    allUsers[idx].nom = nom;
+                    allUsers[idx].pass = pass;
+                    allUsers[idx].role = role;
+                }
+            } else {
+                // Ajout
+                if (allUsers.find(u => u.nom.toLowerCase() === nom.toLowerCase())) {
+                    alert("Ce nom d'utilisateur existe déjà.");
+                    return;
+                }
+                allUsers.push({
+                    id: Date.now(),
+                    nom: nom,
+                    pass: pass,
+                    role: role
+                });
+            }
+
+            localStorage.setItem('users', JSON.stringify(allUsers));
+            closeUserPanel();
+            afficherUsers();
+            calculerIndemnites(); // Update indemnities if an infirmier's name changed or added
+        }
+
+        function deleteUser(id) {
+            if (confirm("Voulez-vous vraiment supprimer cet utilisateur ?")) {
+                let allUsers = JSON.parse(localStorage.getItem('users')) || [];
+                allUsers = allUsers.filter(u => u.id !== id);
+                localStorage.setItem('users', JSON.stringify(allUsers));
+                afficherUsers();
+                calculerIndemnites();
+            }
+        }
+        
+        calculerIndemnites();
+        afficherUsers();
+    </script>
+</body>
+</html> 

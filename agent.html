@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Espace Infirmier</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+    <header>
+        <div class="brand"><i class="fa-solid fa-user-nurse"></i> CABINET<span>MÉDICAL</span></div>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <span id="nameLabel" style="font-weight:600;"></span>
+            <button onclick="sortir()" class="btn-logout"><i class="fa-solid fa-power-off"></i></button>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="top-bar">
+            <h2>Mes Soins à Domicile</h2>
+            <button class="primary-btn" onclick="ouvrir()">
+                <i class="fa-solid fa-plus"></i> Nouveau Soin
+            </button>
+        </div>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Horaires</th>
+                        <th>Durée</th>
+                        <th>Distance</th>
+                        <th style="text-align: right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="listData"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="sideForm" class="side-panel">
+        <button class="close-panel" onclick="fermer()"><i class="fa-solid fa-xmark"></i></button>
+        <h3 id="formTitle" style="margin-bottom:20px;">Saisie Soin</h3>
+        <input type="hidden" id="editId">
+        
+        <div class="fieldBox"><label>Date</label><input type="date" id="vDate"></div>
+        <div class="fieldBox"><label>Début</label><input type="time" id="vDebut"></div>
+        <div class="fieldBox"><label>Fin</label><input type="time" id="vFin"></div>
+        <div class="fieldBox"><label>Distance (Km)</label><input type="number" id="vKm"></div>
+
+        <button class="primary-btn" style="width:100%; margin-top:10px;" onclick="sauver()">Enregistrer</button>
+    </div>
+
+    <script>
+        const u = JSON.parse(localStorage.getItem('activeUser'));
+        if (!u || u.role !== 'infirmier') window.location.href = 'index.html';
+        document.getElementById('nameLabel').innerText = "Inf. " + u.nom;
+
+        function load() {
+            const data = JSON.parse(localStorage.getItem('soins')) || [];
+            const mine = data.filter(s => s.infirmierId === u.id);
+            const box = document.getElementById('listData');
+            box.innerHTML = '';
+            
+            mine.forEach(s => {
+                box.innerHTML += `<tr>
+                <td>${s.date}</td>
+                <td>${s.heureDebut} - ${s.heureFin}</td>
+                <td>${calculerDuree(s.heureDebut, s.heureFin)}</td>
+                <td><span class="badge badge-neutral">${s.distanceKm} Km</span></td>
+                <td style="text-align: right;">
+                    <div class="action-btns" style="justify-content: flex-end;">
+                        <button class="btn-icon btn-edit" onclick="editer(${s.id})"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn-icon btn-delete" onclick="supprimer(${s.id})"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </td></tr>`;
+            });
+        }
+
+        function calculerDuree(d, f) {
+            const [hD, mD] = d.split(':').map(Number);
+            const [hF, mF] = f.split(':').map(Number);
+            const diff = (hF * 60 + mF) - (hD * 60 + mD);
+            if(diff <= 0) return "---";
+            return Math.floor(diff/60) + "h" + (diff%60) + "min";
+        }
+
+        // --- FONCTIONS MODIFIEES ---
+        function ouvrir() { 
+            // Kanhwiw l'formulaire bach ykoun "Nouveau"
+            document.getElementById('editId').value = '';
+            document.getElementById('vDate').value = '';
+            document.getElementById('vDebut').value = '';
+            document.getElementById('vFin').value = '';
+            document.getElementById('vKm').value = '';
+            document.getElementById('formTitle').innerText = "Nouveau Soin";
+            document.getElementById('sideForm').classList.add('active'); 
+        }
+
+        function fermer() { document.getElementById('sideForm').classList.remove('active'); }
+
+        function sauver() {
+            const d = document.getElementById('vDate').value;
+            const deb = document.getElementById('vDebut').value;
+            const fin = document.getElementById('vFin').value;
+            const km = parseFloat(document.getElementById('vKm').value);
+            const id = document.getElementById('editId').value;
+            
+            if(!d || !deb || !fin || !km) return alert("Veuillez remplir tous les champs.");
+
+            let all = JSON.parse(localStorage.getItem('soins')) || [];
+            
+            if (id !== "") {
+                // Modification
+                const i = all.findIndex(x => x.id == id);
+                if (i !== -1) {
+                    all[i] = {id: parseInt(id), infirmierId: u.id, date: d, heureDebut: deb, heureFin: fin, distanceKm: km};
+                }
+            } else {
+                // Ajout
+                all.push({id: Date.now(), infirmierId: u.id, date: d, heureDebut: deb, heureFin: fin, distanceKm: km});
+            }
+            localStorage.setItem('soins', JSON.stringify(all));
+            fermer(); load();
+        }
+
+        function supprimer(id) {
+            if(confirm("Voulez-vous vraiment supprimer ce soin ?")) {
+                let all = JSON.parse(localStorage.getItem('soins'));
+                localStorage.setItem('soins', JSON.stringify(all.filter(x => x.id !== id)));
+                load();
+            }
+        }
+
+        function editer(id) {
+            const item = JSON.parse(localStorage.getItem('soins')).find(x => x.id === id);
+            document.getElementById('editId').value = item.id;
+            document.getElementById('vDate').value = item.date;
+            document.getElementById('vDebut').value = item.heureDebut;
+            document.getElementById('vFin').value = item.heureFin;
+            document.getElementById('vKm').value = item.distanceKm;
+            document.getElementById('formTitle').innerText = "Modifier Soin";
+            document.getElementById('sideForm').classList.add('active');
+        }
+
+        function sortir() { localStorage.removeItem('activeUser'); window.location.href = 'index.html'; }
+        load();
+    </script>
+</body>
+</html>

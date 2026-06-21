@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connexion - CabinetMédical</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="login-screen">
+
+    <!-- Carte de Login & Inscription -->
+    <div class="login-card" id="logCont">
+        <div class="brand"><i class="fa-solid fa-house-medical"></i>MED<span>CARE</span></div>
+        <span class="subtitle" id="subTitle">Gestion des Soins & Indemnités</span>
+        
+        <!-- Login Form -->
+        <div id="loginSection">
+            <div class="fieldBox"><input type="text" id="userInput" placeholder="Identifiant" autocomplete="off"></div>
+            <div class="fieldBox"><input type="password" id="passInput" placeholder="Mot de passe"></div>
+            <button class="primary-btn" onclick="verifierAcces()">
+                <i class="fa-solid fa-right-to-bracket"></i> Se connecter
+            </button>
+            <p style="margin-top:15px; font-size:13px;">
+                Pas de compte ? <a href="#" onclick="showRegister()">S'inscrire</a>
+            </p>
+        </div>
+
+        <!-- Inscription Form -->
+        <div id="registerSection" style="display:none;">
+            <div class="fieldBox"><input type="text" id="regUser" placeholder="Choisir un identifiant"></div>
+            <div class="fieldBox"><input type="password" id="regPass" placeholder="Mot de passe"></div>
+            <button class="primary-btn" onclick="inscrireUser()" style="background:var(--secondary);">
+                <i class="fa-solid fa-user-plus"></i> Créer le compte
+            </button>
+            <p style="margin-top:15px; font-size:13px;">
+                Déjà un compte ? <a href="#" onclick="showLogin()">Se connecter</a>
+            </p>
+        </div>
+        
+        <p id="errorTxt" style="color:var(--danger); font-size:13px; display:none; margin-top:15px; font-weight:600;"></p>
+    </div>
+
+    <!-- Carte de Succès -->
+    <div class="login-card" id="succesCont" style="display: none;">
+        <i class="fa-solid fa-circle-check" style="font-size: 60px; color: var(--secondary); margin-bottom: 20px;"></i>
+        <h2 id="greetMsg" style="color: var(--dark); font-weight: 600; margin-bottom: 5px;"></h2>
+        <p style="color:#64748b; font-size:14px; margin-bottom: 25px;">Connexion sécurisée établie.</p>
+        <button class="primary-btn" onclick="allerAuDash()">
+            <i class="fa-solid fa-chart-line"></i> Accéder au tableau de bord
+        </button>
+    </div>
+
+    <script>
+        // Initialisation
+        const listeInitiale = [
+            { id: 1, nom: "Major", pass: "admin2026", role: "admin" },
+            { id: 101, nom: "Yasmine", pass: "yas123", role: "infirmier" },
+            { id: 102, nom: "Karim", pass: "kar123", role: "infirmier"}
+        ];
+        
+        if (!localStorage.getItem('users')) localStorage.setItem('users', JSON.stringify(listeInitiale));
+
+        // Fonctions pour basculer entre Login et Inscription
+        function showRegister() {
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('registerSection').style.display = 'block';
+            document.getElementById('subTitle').innerText = "Inscription Infirmier";
+        }
+
+        function showLogin() {
+            document.getElementById('loginSection').style.display = 'block';
+            document.getElementById('registerSection').style.display = 'none';
+            document.getElementById('subTitle').innerText = "Gestion des Soins & Indemnités";
+        }
+
+        // Fonction Inscription
+        function inscrireUser() {
+            const n = document.getElementById('regUser').value.trim();
+            const p = document.getElementById('regPass').value.trim();
+            const e = document.getElementById('errorTxt');
+
+            if(!n || !p) { e.innerText = "Champs obligatoires."; e.style.display="block"; return; }
+            
+            let db = JSON.parse(localStorage.getItem('users'));
+            if(db.find(u => u.nom.toLowerCase() === n.toLowerCase())) {
+                e.innerText = "Utilisateur existe déjà."; e.style.display="block"; return;
+            }
+
+            db.push({ id: Date.now(), nom: n, pass: p, role: "infirmier" });
+            localStorage.setItem('users', JSON.stringify(db));
+            alert("Compte créé avec succès !");
+            showLogin();
+        }
+
+        // Fonction Login (Votre code original)
+        let sessionActive = null;
+        function verifierAcces() {
+            const n = document.getElementById('userInput').value.trim();
+            const p = document.getElementById('passInput').value.trim();
+            const e = document.getElementById('errorTxt');
+
+            const db = JSON.parse(localStorage.getItem('users'));
+            const u = db.find(user => user.nom.toLowerCase() === n.toLowerCase() && user.pass === p);
+            
+            if (u) {
+                sessionActive = u;
+                localStorage.setItem('activeUser', JSON.stringify(u));
+                document.getElementById('logCont').style.display = 'none';
+                document.getElementById('succesCont').style.display = 'block';
+                document.getElementById('greetMsg').innerText = "Bonjour, " + u.nom;
+            } else {
+                e.innerText = "Identifiants incorrects."; 
+                e.style.display = "block";
+            }
+        }
+
+        function allerAuDash() {
+            window.location.href = sessionActive.role === "admin" ? "admin.html" : "agent.html";
+        }
+    </script>
+</body>
+</html>
